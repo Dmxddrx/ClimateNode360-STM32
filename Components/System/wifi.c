@@ -226,3 +226,67 @@ int8_t WIFI_IsConnected(void) {
     /* If it timed out or responded with "No AP", it is offline */
     return 0;
 }
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* NTP TIME SYNCHRONIZATION                                        */
+/* ═══════════════════════════════════════════════════════════════ */
+int8_t WIFI_GetNTPTime(RTC_TimeTypeDef *rtc_time) {
+    // 1. Enable SNTP, set timezone to +5:30, and target pool.ntp.org
+    WIFI_SendCommand("AT+CIPSNTPCFG=1,5.5,\"pool.ntp.org\"\r\n");
+    WIFI_WaitForResponse("OK", 1000);
+
+    // 2. Poll for the time. It takes a second or two for the ESP to fetch it over the internet.
+    for (int i = 0; i < 5; i++) {
+        HAL_Delay(1000); // Wait 1 second between attempts
+
+        WIFI_SendCommand("AT+CIPSNTPTIME?\r\n");
+        if (WIFI_WaitForResponse("+CIPSNTPTIME:", 1000)) {
+
+            char *time_ptr = strstr(buffer, "+CIPSNTPTIME:");
+
+            // If the ESP returns 1970, it hasn't successfully synced with the server yet.
+            if (time_ptr != NULL && !strstr(time_ptr, "1970")) {
+
+                char dow_str[4], mon_str[4];
+                int day, hour, min, sec, year;
+
+                // Example ESP8266 Response: +CIPSNTPTIME:Wed Jul 22 12:42:22 2026
+                if (sscanf(time_ptr, "+CIPSNTPTIME:%3s %3s %d %d:%d:%d %d",
+                           dow_str, mon_str, &day, &hour, &min, &sec, &year) == 7) {
+
+                    rtc_time->Seconds = sec;
+                    rtc_time->Minutes = min;
+                    rtc_time->Hour = hour;
+                    rtc_time->Date = day;
+                    rtc_time->Year = year % 100; // Convert 2026 to 26
+
+                    // Convert Month String to Number
+                    if (strstr(mon_str, "Jan")) rtc_time->Month = 1;
+                    else if (strstr(mon_str, "Feb")) rtc_time->Month = 2;
+                    else if (strstr(mon_str, "Mar")) rtc_time->Month = 3;
+                    else if (strstr(mon_str, "Apr")) rtc_time->Month = 4;
+                    else if (strstr(mon_str, "May")) rtc_time->Month = 5;
+                    else if (strstr(mon_str, "Jun")) rtc_time->Month = 6;
+                    else if (strstr(mon_str, "Jul")) rtc_time->Month = 7;
+                    else if (strstr(mon_str, "Aug")) rtc_time->Month = 8;
+                    else if (strstr(mon_str, "Sep")) rtc_time->Month = 9;
+                    else if (strstr(mon_str, "Oct")) rtc_time->Month = 10;
+                    else if (strstr(mon_str, "Nov")) rtc_time->Month = 11;
+                    else if (strstr(mon_str, "Dec")) rtc_time->Month = 12;
+
+                    // Convert Day String to Number
+                    if (strstr(dow_str, "Mon")) rtc_time->DayOfWeek = 1;
+                    else if (strstr(dow_str, "Tue")) rtc_time->DayOfWeek = 2;
+                    else if (strstr(dow_str, "Wed")) rtc_time->DayOfWeek = 3;
+                    else if (strstr(dow_str, "Thu")) rtc_time->DayOfWeek = 4;
+                    else if (strstr(dow_str, "Fri")) rtc_time->DayOfWeek = 5;
+                    else if (strstr(dow_str, "Sat")) rtc_time->DayOfWeek = 6;
+                    else if (strstr(dow_str, "Sun")) rtc_time->DayOfWeek = 7;
+
+                    return 1; // Successfully parsed and synced!
+                }
+            }
+        }
+    }
+    return 0; // Failed to sync after 5 attempts
+}

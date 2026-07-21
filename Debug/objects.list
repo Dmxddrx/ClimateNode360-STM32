@@ -2,6 +2,7 @@
 "./Components/Hardware/buzzer.o"
 "./Components/Hardware/led.o"
 "./Components/Sensors/dust.o"
+"./Components/Sensors/rtc.o"
 "./Components/Sensors/sd.o"
 "./Components/Sensors/sht30.o"
 "./Components/System/fatfs_sd.o"

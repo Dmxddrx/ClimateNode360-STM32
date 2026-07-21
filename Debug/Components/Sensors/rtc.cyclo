@@ -1,0 +1,3 @@
+../Components/Sensors/rtc.c:18:6:RTC_Init	1
+../Components/Sensors/rtc.c:22:9:RTC_GetTime	3
+../Components/Sensors/rtc.c:48:9:RTC_SetTime	1

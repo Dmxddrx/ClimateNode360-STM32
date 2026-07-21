@@ -7,3 +7,4 @@
 ../Components/System/wifi.c:174:8:WIFI_StartUDP	1
 ../Components/System/wifi.c:188:8:WIFI_SendUDPData	3
 ../Components/System/wifi.c:214:8:WIFI_IsConnected	2
+../Components/System/wifi.c:233:8:WIFI_GetNTPTime	25

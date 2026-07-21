@@ -6,16 +6,19 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
 ../Components/Sensors/dust.c \
+../Components/Sensors/rtc.c \
 ../Components/Sensors/sd.c \
 ../Components/Sensors/sht30.c 
 
 OBJS += \
 ./Components/Sensors/dust.o \
+./Components/Sensors/rtc.o \
 ./Components/Sensors/sd.o \
 ./Components/Sensors/sht30.o 
 
 C_DEPS += \
 ./Components/Sensors/dust.d \
+./Components/Sensors/rtc.d \
 ./Components/Sensors/sd.d \
 ./Components/Sensors/sht30.d 
 
@@ -27,7 +30,7 @@ Components/Sensors/%.o Components/Sensors/%.su Components/Sensors/%.cyclo: ../Co
 clean: clean-Components-2f-Sensors
 
 clean-Components-2f-Sensors:
-	-$(RM) ./Components/Sensors/dust.cyclo ./Components/Sensors/dust.d ./Components/Sensors/dust.o ./Components/Sensors/dust.su ./Components/Sensors/sd.cyclo ./Components/Sensors/sd.d ./Components/Sensors/sd.o ./Components/Sensors/sd.su ./Components/Sensors/sht30.cyclo ./Components/Sensors/sht30.d ./Components/Sensors/sht30.o ./Components/Sensors/sht30.su
+	-$(RM) ./Components/Sensors/dust.cyclo ./Components/Sensors/dust.d ./Components/Sensors/dust.o ./Components/Sensors/dust.su ./Components/Sensors/rtc.cyclo ./Components/Sensors/rtc.d ./Components/Sensors/rtc.o ./Components/Sensors/rtc.su ./Components/Sensors/sd.cyclo ./Components/Sensors/sd.d ./Components/Sensors/sd.o ./Components/Sensors/sd.su ./Components/Sensors/sht30.cyclo ./Components/Sensors/sht30.d ./Components/Sensors/sht30.o ./Components/Sensors/sht30.su
 
 .PHONY: clean-Components-2f-Sensors
 

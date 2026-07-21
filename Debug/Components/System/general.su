@@ -1,4 +1,4 @@
 ../Components/System/general.c:13:6:Scan_I2C_Bus	32	static
 ../Components/System/general.c:49:6:Network_Connect_Routine	112	static
-../Components/System/general.c:119:6:General_Init	520	static
-../Components/System/general.c:229:6:General_Run	80	static
+../Components/System/general.c:134:6:General_Init	512	static
+../Components/System/general.c:245:6:General_Run	80	static

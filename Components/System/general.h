@@ -12,6 +12,7 @@
 #include "dust.h"
 #include "buzzer.h"
 #include "led.h"
+#include "rtc.h"
 
 #include <stdio.h>
 #include <string.h>

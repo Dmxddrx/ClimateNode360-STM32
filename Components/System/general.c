@@ -105,6 +105,21 @@ void Network_Connect_Routine(void) {
             LED_WifiDisconnected();
         }
         OLED_Update();
+
+        if (wifi_is_connected) {
+			OLED_Print(0, 56, "Syncing Time...");
+			OLED_Update();
+
+			RTC_TimeTypeDef net_time;
+			if (WIFI_GetNTPTime(&net_time)) {
+				RTC_SetTime(&net_time);
+				OLED_Print(0, 56, "Time Synced!   ");
+			} else {
+				OLED_Print(0, 56, "Time Sync Fail ");
+			}
+			OLED_Update();
+		}
+
         HAL_Delay(2000);
     } else {
         OLED_Print(0, 36, "APs Failed. Solo Mode");
@@ -143,6 +158,7 @@ void General_Init(void) {
     OLED_Print(0, 26, print_buf);
 
 	// Initialize Temperature Sensor, Dust sensor
+    RTC_Init(&hi2c1);
     SHT30_Init(&hi2c1);
     initDustSensor();
 
@@ -209,7 +225,7 @@ void General_Init(void) {
         // ---------------------------------------------------------
 		// PAGE 3: SHOW INITIAL SENSOR PAGE & WAIT BEFORE MAIN LOOP
 		// ---------------------------------------------------------
-        OLED_GUI_DrawSensorPage(temp, hum, dust);
+        OLED_GUI_DrawTimePage();
         OLED_Update();
         HAL_Delay(4000);
         return;
@@ -218,7 +234,7 @@ void General_Init(void) {
     // ---------------------------------------------------------
     // PAGE 3: SHOW INITIAL SENSOR PAGE & WAIT BEFORE MAIN LOOP
     // ---------------------------------------------------------
-    OLED_GUI_DrawSensorPage(temp, hum, dust);
+    OLED_GUI_DrawTimePage();
     OLED_Update();
     HAL_Delay(1000);
 }
@@ -285,6 +301,8 @@ void General_Run(void) {
 		            OLED_GUI_DrawDiagnosticsPage();
 		        } else if (current_page == 5) {
 		            OLED_GUI_DrawLogPage();
+		        } else if (current_page == 6) {     // <--- ADD THIS
+		            OLED_GUI_DrawTimePage();
 		        }
 		        OLED_Update();
 	}
@@ -317,9 +335,11 @@ void General_Run(void) {
         } else if (current_page == 3) {
             OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
             OLED_Update();
+        } else if (current_page == 6) {     // <--- ADD THIS
+            OLED_GUI_DrawTimePage();
+            OLED_Update();
         }
 
-        // Notice we removed the Wi-Fi transmission from here!
     }
 
     // ---------------------------------------------------------
@@ -346,7 +366,6 @@ void General_Run(void) {
     if (now - last_log_tick >= 15000) {
         last_log_tick = now;
 
-        const char* current_status = sensor_ok ? "OK" : "ERROR";
 
         // --- SD CARD AUTO-REMOUNT ---
 		// If the card was removed or failed at boot, try to initialize it again
@@ -393,6 +412,8 @@ void General_Run(void) {
 				OLED_GUI_DrawDiagnosticsPage();
 			} else if (current_page == 5) {
 	            OLED_GUI_DrawLogPage();
+	        } else if (current_page == 6) {     // <--- ADD THIS
+	            OLED_GUI_DrawTimePage();
 	        }
             OLED_Update();
         }
@@ -406,7 +427,7 @@ void General_Run(void) {
 
         if (BTNS_Get_OLEDPage() == BTN_PRESSED) {
             current_page++;
-            if (current_page > 5) current_page = 0;
+            if (current_page > 6) current_page = 0;
 
             if (current_page == 0) {
                 OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
@@ -420,6 +441,8 @@ void General_Run(void) {
 				OLED_GUI_DrawDiagnosticsPage();
 			} else if (current_page == 5) {
 	            OLED_GUI_DrawLogPage();
+	        } else if (current_page == 6) {     // <--- ADD THIS
+	            OLED_GUI_DrawTimePage();
 	        }
             OLED_Update();
         }

@@ -184,3 +184,37 @@ void OLED_GUI_DrawLogPage(void) {
     OLED_Print(0, 42, "Latest Entry:");
     OLED_Print(0, 52, last_data);
 }
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* RTC DATE & TIME PAGE (PAGE 6)                                   */
+/* ═══════════════════════════════════════════════════════════════ */
+void OLED_GUI_DrawTimePage(void) {
+    RTC_TimeTypeDef rtc_time;
+    char buf[32];
+
+    OLED_Clear();
+    OLED_Print(0, 0, "RTC Date & Time");
+
+    // Fetch the live time from the DS3231 module
+    if (RTC_GetTime(&rtc_time)) {
+        // Format Date: YYYY-MM-DD
+        snprintf(buf, sizeof(buf), "Date: 20%02d-%02d-%02d",
+                 rtc_time.Year, rtc_time.Month, rtc_time.Date);
+        OLED_Print(0, 20, buf);
+
+        // Format Time: HH:MM:SS
+        snprintf(buf, sizeof(buf), "Time: %02d:%02d:%02d",
+                 rtc_time.Hour, rtc_time.Minutes, rtc_time.Seconds);
+        OLED_Print(0, 36, buf);
+
+        // Map the Day of the Week
+        const char *days[] = {"", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+        if (rtc_time.DayOfWeek >= 1 && rtc_time.DayOfWeek <= 7) {
+            snprintf(buf, sizeof(buf), "Day:  %s", days[rtc_time.DayOfWeek]);
+            OLED_Print(0, 52, buf);
+        }
+    } else {
+        OLED_Print(0, 20, "Status: OFFLINE");
+        OLED_Print(0, 36, "Check RTC module!");
+    }
+}

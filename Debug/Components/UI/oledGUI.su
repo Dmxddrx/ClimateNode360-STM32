@@ -4,3 +4,4 @@
 ../Components/UI/oledGUI.c:111:6:OLED_GUI_DrawWeatherPage	48	static
 ../Components/UI/oledGUI.c:131:6:OLED_GUI_DrawDiagnosticsPage	8	static
 ../Components/UI/oledGUI.c:164:6:OLED_GUI_DrawLogPage	80	static
+../Components/UI/oledGUI.c:191:6:OLED_GUI_DrawTimePage	96	static
