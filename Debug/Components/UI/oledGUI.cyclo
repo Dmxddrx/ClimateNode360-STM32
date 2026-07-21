@@ -1,0 +1,6 @@
+../Components/UI/oledGUI.c:31:6:OLED_GUI_DrawSensorPage	2
+../Components/UI/oledGUI.c:56:6:render_wifi_page	3
+../Components/UI/oledGUI.c:89:6:OLED_GUI_DrawDustDebugPage	1
+../Components/UI/oledGUI.c:111:6:OLED_GUI_DrawWeatherPage	2
+../Components/UI/oledGUI.c:131:6:OLED_GUI_DrawDiagnosticsPage	5
+../Components/UI/oledGUI.c:164:6:OLED_GUI_DrawLogPage	2

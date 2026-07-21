@@ -1,0 +1,12 @@
+../Components/Hardware/led.c:19:6:LED_Init	1
+../Components/Hardware/led.c:26:6:LED_Boot	1
+../Components/Hardware/led.c:37:6:LED_WifiConnecting	1
+../Components/Hardware/led.c:44:6:LED_WifiConnected	1
+../Components/Hardware/led.c:51:6:LED_WifiDisconnected	1
+../Components/Hardware/led.c:61:6:LED_ProcessReconnecting	5
+../Components/Hardware/led.c:88:6:LED_Off	1
+../Components/Hardware/led.c:98:6:LED_UploadSuccess	1
+../Components/Hardware/led.c:105:6:LED_UploadFail	1
+../Components/Hardware/led.c:116:6:LED_HardwareError	2
+../Components/Hardware/led.c:128:6:LED_FormatSuccess	2
+../Components/Hardware/led.c:140:6:LED_FormatFail	2

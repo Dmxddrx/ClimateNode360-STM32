@@ -1,0 +1,9 @@
+../Components/System/wifi.c:10:6:WIFI_SendCommand	16	static
+../Components/System/wifi.c:23:8:WIFI_WaitForResponse	40	static
+../Components/System/wifi.c:54:8:WIFI_Init	24	static
+../Components/System/wifi.c:105:8:WIFI_Connect	152	static
+../Components/System/wifi.c:148:6:WIFI_Disconnect	8	static
+../Components/System/wifi.c:153:8:WIFI_GetIP	24	static
+../Components/System/wifi.c:174:8:WIFI_StartUDP	136	static
+../Components/System/wifi.c:188:8:WIFI_SendUDPData	56	static
+../Components/System/wifi.c:214:8:WIFI_IsConnected	8	static

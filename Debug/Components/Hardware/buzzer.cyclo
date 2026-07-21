@@ -1,0 +1,9 @@
+../Components/Hardware/buzzer.c:9:6:Buzzer_PlayTone	2
+../Components/Hardware/buzzer.c:42:6:Buzzer_BootSound	2
+../Components/Hardware/buzzer.c:51:6:Buzzer_WifiConnected	1
+../Components/Hardware/buzzer.c:58:6:Buzzer_WifiDisconnected	1
+../Components/Hardware/buzzer.c:68:6:Buzzer_LongPressAck	1
+../Components/Hardware/buzzer.c:72:6:Buzzer_FormatSuccess	1
+../Components/Hardware/buzzer.c:76:6:Buzzer_FormatFail	1
+../Components/Hardware/buzzer.c:80:6:Buzzer_SD_Inserted	1
+../Components/Hardware/buzzer.c:84:6:Buzzer_SD_Removed	1

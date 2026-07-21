@@ -1,0 +1,38 @@
+#include "wcmcu75.h"
+
+static I2C_HandleTypeDef *lm75_i2c;
+static uint8_t lm75_addr;
+
+void WCMCU75_Init(I2C_HandleTypeDef *hi2c, uint8_t a0, uint8_t a1, uint8_t a2) {
+    lm75_i2c = hi2c;
+
+    // The LM75A base 7-bit address is 0x48 (0b1001000)
+    // The lowest 3 bits are configured by the A2, A1, and A0 pins
+    uint8_t address_7bit = 0x48 | ((a2 & 0x01) << 2) | ((a1 & 0x01) << 1) | (a0 & 0x01);
+
+    // The STM32 HAL requires the 7-bit address to be shifted left by 1 bit
+    lm75_addr = address_7bit << 1;
+}
+
+float WCMCU75_ReadTemp(void) {
+    uint8_t buffer[2];
+
+    // Read 2 bytes from the Temperature Register (Register Address 0x00)
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(lm75_i2c, lm75_addr, 0x00, 1, buffer, 2, 100);
+
+    if (status != HAL_OK) {
+        return -999.0f; // Return an obvious error value if the sensor disconnects
+    }
+
+    // The LM75A outputs an 11-bit signed number (Two's Complement).
+    // The MSB is in buffer[0], and the top 3 bits of buffer[1] contain the fraction.
+    int16_t raw_temp = (int16_t)((buffer[0] << 8) | buffer[1]);
+
+    // Shift right by 5 bits to isolate the 11 data bits.
+    // Because raw_temp is a signed int16_t, the C compiler performs an arithmetic shift,
+    // which automatically preserves the sign bit for negative temperatures.
+    raw_temp >>= 5;
+
+    // Multiply by the sensor's resolution (0.125 Celsius per bit)
+    return (float)raw_temp * 0.125f;
+}

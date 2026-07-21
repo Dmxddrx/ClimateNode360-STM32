@@ -1,0 +1,11 @@
+../Components/System/fatfs_sd.c:33:13:SD_Select	1
+../Components/System/fatfs_sd.c:27:16:SPI_RxByte	1
+../Components/System/fatfs_sd.c:42:16:SD_WaitReady	3
+../Components/System/fatfs_sd.c:37:13:SD_Deselect	1
+../Components/System/fatfs_sd.c:23:13:SPI_TxByte	1
+../Components/System/fatfs_sd.c:51:16:SD_SendCmd	5
+../Components/System/fatfs_sd.c:74:9:FATFS_SD_Init	20
+../Components/System/fatfs_sd.c:126:9:FATFS_SD_Status	1
+../Components/System/fatfs_sd.c:130:9:FATFS_SD_Read	8
+../Components/System/fatfs_sd.c:152:9:FATFS_SD_Write	6
+../Components/System/fatfs_sd.c:174:9:FATFS_SD_Ioctl	12

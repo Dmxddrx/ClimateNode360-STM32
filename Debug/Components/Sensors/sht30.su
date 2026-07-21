@@ -1,0 +1,2 @@
+../Components/Sensors/sht30.c:6:6:SHT30_Init	0	static
+../Components/Sensors/sht30.c:14:9:SHT30_Read	48	static

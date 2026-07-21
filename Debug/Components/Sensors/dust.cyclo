@@ -1,0 +1,2 @@
+../Components/Sensors/dust.c:10:6:initDustSensor	1
+../Components/Sensors/dust.c:15:9:readDust	4
