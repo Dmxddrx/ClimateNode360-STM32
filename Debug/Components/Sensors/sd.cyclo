@@ -1,5 +1,6 @@
 ../Components/Sensors/sd.c:16:9:SD_Init	11
-../Components/Sensors/sd.c:74:9:SD_LogData	5
-../Components/Sensors/sd.c:126:9:SD_Format	3
-../Components/Sensors/sd.c:155:9:SD_IsReady	1
-../Components/Sensors/sd.c:159:6:SD_GetLogStats	1
+../Components/Sensors/sd.c:74:9:SD_LogData	7
+../Components/Sensors/sd.c:132:9:SD_Format	3
+../Components/Sensors/sd.c:161:9:SD_IsReady	1
+../Components/Sensors/sd.c:165:6:SD_GetLogStats	1
+../Components/Sensors/sd.c:170:6:SD_ClearLog	3

@@ -40,8 +40,8 @@ Components/UI/oledGUI.o: ../Components/UI/oledGUI.c \
  H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/UI/oledGUI.h \
  H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/System/wifi.h \
  H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Sensors/rtc.h \
- H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Sensors/sd.h \
  H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Hardware/btns.h \
+ H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Sensors/sd.h \
  H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Sensors/sht30.h \
  H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Sensors/dust.h \
  H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Hardware/buzzer.h \
@@ -92,8 +92,8 @@ H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode36
 H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/UI/oledGUI.h:
 H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/System/wifi.h:
 H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Sensors/rtc.h:
-H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Sensors/sd.h:
 H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Hardware/btns.h:
+H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Sensors/sd.h:
 H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Sensors/sht30.h:
 H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Sensors/dust.h:
 H:/Programing_Files_IoT/STM32CubeIDE/workspace_2.1.1/STM32F103C8T6/ClimateNode360/Components/Hardware/buzzer.h:

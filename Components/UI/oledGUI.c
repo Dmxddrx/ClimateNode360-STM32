@@ -57,32 +57,53 @@ void render_wifi_page(void) {
     OLED_Clear();
     OLED_Print(0, 0, "NETWORK");
 
-    //OLED_DrawOutline(0, 16, 96, 10);
-
-    OLED_Print(0, 16, "ESP-01S");
+    // 1. ESP Hardware Status
     if (esp_is_ready) {
+        OLED_Print(0, 16, "ESP-01S");
         OLED_Print(0, 26, "READY");
     } else {
+        OLED_Print(0, 16, "ESP-01S");
         OLED_Print(0, 26, "ERROR");
     }
 
-    OLED_Print(50, 16, "Wi-Fi");
+    // 2. Wi-Fi & Connection Info
     if (wifi_is_connected) {
-        OLED_Print(50, 26, "ONLINE");
-        OLED_Print(50, 0, current_ip);
 
-		OLED_Print(0, 38, current_ssid);
-		OLED_Print(0, 48, current_pc_ip);
+    	OLED_Print(50, 16, "WIFI");
+    	OLED_Print(50, 26, "ONLINE");
 
+        // Print the active Local IP Address
+        char ip_buf[24];
+        snprintf(ip_buf, sizeof(ip_buf), "%s", current_ip);
+        OLED_Print(50, 0, ip_buf);
+
+        // Print the connected SSID
+        char ssid_buf[36];
+        snprintf(ssid_buf, sizeof(ssid_buf), "AP: %s", current_ssid);
+        OLED_Print(0, 36, ssid_buf);
+
+        // Print the Target PC IP Address
+        char pc_buf[24];
+        snprintf(pc_buf, sizeof(pc_buf), "PC: %s", current_pc_ip);
+        OLED_Print(0, 46, pc_buf);
+
+        // Print the independent TCP socket status
+        if (tcp_is_connected) {
+            OLED_Print(0, 55, "TCP: CONNECTED");
+        } else {
+            OLED_Print(0, 55, "TCP: RETRYING");
+        }
     } else {
+        // Offline Fallback Layout
+        OLED_Print(50, 16, "WIFI");
         OLED_Print(50, 26, "OFFLINE");
-        OLED_Print(50, 0, "Not Assigned");
 
-		char last_ap_buf[40];
-		snprintf(last_ap_buf, sizeof(last_ap_buf), "Last: %s", current_ssid);
-		OLED_Print(0, 38, last_ap_buf);
-		OLED_Print(0, 48, "IP: Disconnected");
+        char last_ap_buf[38];
+        snprintf(last_ap_buf, sizeof(last_ap_buf), "Last: %s", current_ssid);
+        OLED_Print(0, 36, last_ap_buf);
 
+        OLED_Print(50, 0, "0.0.0.0"); //Local IP Address
+        OLED_Print(0, 55, "TCP: OFFLINE");
     }
 }
 
@@ -197,24 +218,36 @@ void OLED_GUI_DrawTimePage(void) {
 
     // Fetch the live time from the DS3231 module
     if (RTC_GetTime(&rtc_time)) {
+
         // Format Date: YYYY-MM-DD
         snprintf(buf, sizeof(buf), "Date: 20%02d-%02d-%02d",
                  rtc_time.Year, rtc_time.Month, rtc_time.Date);
-        OLED_Print(0, 20, buf);
+        OLED_Print(0, 16, buf);
 
         // Format Time: HH:MM:SS
         snprintf(buf, sizeof(buf), "Time: %02d:%02d:%02d",
                  rtc_time.Hour, rtc_time.Minutes, rtc_time.Seconds);
-        OLED_Print(0, 36, buf);
+        OLED_Print(0, 26, buf);
 
         // Map the Day of the Week
         const char *days[] = {"", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
         if (rtc_time.DayOfWeek >= 1 && rtc_time.DayOfWeek <= 7) {
             snprintf(buf, sizeof(buf), "Day:  %s", days[rtc_time.DayOfWeek]);
-            OLED_Print(0, 52, buf);
+            OLED_Print(0, 36, buf);
         }
+
+        // Show the Network Sync Status
+        if (ntp_sync_status) {
+			OLED_Print(0, 55, "NTP: SUCCESS");
+		} else {
+			// Print the exact raw failure reason
+			char sync_buf[70];
+			snprintf(sync_buf, sizeof(sync_buf), "NTP: %s", ntp_debug_str);
+			OLED_Print(0, 46, sync_buf);
+		}
+
     } else {
-        OLED_Print(0, 20, "Status: OFFLINE");
-        OLED_Print(0, 36, "Check RTC module!");
+        OLED_Print(0, 16, "Status: OFFLINE");
+        OLED_Print(0, 26, "Check RTC module!");
     }
 }

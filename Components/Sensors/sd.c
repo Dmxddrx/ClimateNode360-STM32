@@ -55,9 +55,9 @@ uint8_t SD_Init(void) {
 
             // 4. Update the CSV Header row to include Humidity
             if (f_size(&log_file) == 0) {
-                const char* header = "SystemTick_ms,Device,Temperature(C),Humidity(%),Status\n";
-                f_write(&log_file, header, strlen(header), &bytes_written);
-            }
+				const char* header = "Date,Time,Device,Temperature(C),Humidity(%),Status\n"; // <--- UPDATED
+				f_write(&log_file, header, strlen(header), &bytes_written);
+			}
 
             // 5. Safely close the file
             f_close(&log_file);
@@ -82,10 +82,16 @@ uint8_t SD_LogData(float temperature, float humidity, int16_t dust, const char* 
     }
 
     // 1. Format the data into a standard CSV string including humidity and dust
-    // NOTE: Dust is divided by 10.0f here to convert the integer back into a proper decimal
-    uint32_t current_tick = HAL_GetTick();
-    snprintf(buffer, sizeof(buffer), "%lu,Node360,%.1f,%.1f,%.1f,%s\n",
-             current_tick, temperature, humidity, (float)dust / 10.0f, status);
+    RTC_TimeTypeDef now;
+	char time_str[32] = "1970-01-01,00:00:00"; // Fallback if RTC fails
+
+	if (RTC_GetTime(&now)) {
+		// Format as "YYYY-MM-DD,HH:MM:SS"
+		snprintf(time_str, sizeof(time_str), "20%02d-%02d-%02d,%02d:%02d:%02d",
+				 now.Year, now.Month, now.Date, now.Hour, now.Minutes, now.Seconds);
+	}
+	snprintf(buffer, sizeof(buffer), "%s,Node360,%.1f,%.1f,%.1f,%s\n",
+	             time_str, temperature, humidity, (float)dust / 10.0f, status);
 
     // 2. Open the file
     if (f_open(&log_file, "data.csv", FA_OPEN_ALWAYS | FA_WRITE) == FR_OK) {
@@ -159,4 +165,14 @@ uint8_t SD_IsReady(void) {
 void SD_GetLogStats(uint32_t *rows, char *last_line) {
     *rows = total_data_rows;
     strncpy(last_line, last_logged_data, 32);
+}
+
+void SD_ClearLog(void) {
+    if (!sd_is_ready) return;
+
+    // f_unlink deletes the file completely from the FAT32 system
+    if (f_unlink("data.csv") == FR_OK) {
+        total_data_rows = 0;
+        strncpy(last_logged_data, "No Data Yet", 32);
+    }
 }

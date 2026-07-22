@@ -12,46 +12,60 @@
 #define BLUE_ON()   HAL_GPIO_WritePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin, GPIO_PIN_RESET)
 #define BLUE_OFF()  HAL_GPIO_WritePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin, GPIO_PIN_SET)
 
+
+/* ==================================================================== */
+/* COLOR MIXING MACROS                                                  */
+/* ==================================================================== */
+#define COLOR_OFF()     { RED_OFF(); GREEN_OFF(); BLUE_OFF(); }
+#define COLOR_RED()     { RED_ON();  GREEN_OFF(); BLUE_OFF(); }
+#define COLOR_GREEN()   { RED_OFF(); GREEN_ON();  BLUE_OFF(); }
+#define COLOR_BLUE()    { RED_OFF(); GREEN_OFF(); BLUE_ON();  }
+#define COLOR_YELLOW()  { RED_ON();  GREEN_ON();  BLUE_OFF(); }
+#define COLOR_CYAN()    { RED_OFF(); GREEN_ON();  BLUE_ON();  }
+#define COLOR_MAGENTA() { RED_ON();  GREEN_OFF(); BLUE_ON();  }
+#define COLOR_WHITE()   { RED_ON();  GREEN_ON();  BLUE_ON();  }
+
 /* ==================================================================== */
 /* CORE SYSTEM PATTERNS                                                 */
 /* ==================================================================== */
 
 void LED_Init(void) {
     // Force all colors OFF on boot
-    RED_OFF();
-    GREEN_OFF();
-    BLUE_OFF();
+	COLOR_OFF();
 }
 
 void LED_Boot(void) {
-    // Red blink twice
-    RED_ON(); HAL_Delay(150); RED_OFF(); HAL_Delay(150);
-    RED_ON(); HAL_Delay(150); RED_OFF(); HAL_Delay(150);
+	// White blink twice to indicate core system boot
+	COLOR_WHITE(); HAL_Delay(150); COLOR_OFF(); HAL_Delay(150);
+	COLOR_WHITE(); HAL_Delay(150); COLOR_OFF(); HAL_Delay(150);
 
-    // Green solid for 1 second
-    GREEN_ON();
-    HAL_Delay(1000);
-    GREEN_OFF();
+	// Solid White for 1 second
+	COLOR_GREEN()
+	HAL_Delay(1000);
+	COLOR_OFF();
 }
+
+/* ==================================================================== */
+/* WIFI PATTERNS (Blue)                                                 */
+/* ==================================================================== */
 
 void LED_WifiConnecting(void) {
     // Quick Blue pulse when actively trying to reach an Access Point
-    BLUE_ON();
-    HAL_Delay(100);
-    BLUE_OFF();
+	COLOR_BLUE();
+	HAL_Delay(100);
+	COLOR_OFF();
 }
 
 void LED_WifiConnected(void) {
-    // Green blink twice
-    BLUE_ON();
-    HAL_Delay(1000);
-    BLUE_OFF();
+	COLOR_BLUE();
+	HAL_Delay(1000);
+	COLOR_OFF();
 }
 
 void LED_WifiDisconnected(void) {
-    // Red blink twice
-    RED_ON(); HAL_Delay(100); RED_OFF(); HAL_Delay(100);
-    RED_ON(); HAL_Delay(100); RED_OFF();
+	// Blue to Red blink indicating radio failure
+	COLOR_BLUE(); HAL_Delay(100); COLOR_OFF(); HAL_Delay(100);
+	COLOR_RED();  HAL_Delay(100); COLOR_OFF();
 }
 
 /* ==================================================================== */
@@ -59,90 +73,110 @@ void LED_WifiDisconnected(void) {
 /* ==================================================================== */
 
 void LED_ProcessReconnecting(void) {
-    static uint32_t last_tick = 0;
-    static uint8_t step = 0;
+    static uint32_t last_tick = 0; //[cite: 2]
+    static uint8_t step = 0;       //[cite: 2]
 
-    uint32_t now = HAL_GetTick();
+    uint32_t now = HAL_GetTick();  //[cite: 2]
 
-    // Determine how long to wait based on the current step
-    // Step 0 (Red) and Step 2 (Blue) stay on for 150ms.
-    // Step 1 and 3 (Off) stay off for 50ms.
-    uint32_t delay = (step == 1 || step == 3) ? 50 : 150;
+    uint32_t delay = (step == 1 || step == 3) ? 50 : 150; //[cite: 2]
 
-    if (now - last_tick >= delay) {
-        last_tick = now;
-        step++;
-        if (step > 3) step = 0; // Reset loop
+    if (now - last_tick >= delay) { //[cite: 2]
+        last_tick = now;            //[cite: 2]
+        step++;                     //[cite: 2]
+        if (step > 3) step = 0;     //[cite: 2]
 
-        // Execute the color change for this step
+        // Yellow (Warning) to Blue (Radio) pulse
         if (step == 0) {
-            RED_ON(); BLUE_OFF(); GREEN_OFF();
+            COLOR_YELLOW();
         } else if (step == 1 || step == 3) {
-            RED_OFF(); BLUE_OFF(); GREEN_OFF();
+            COLOR_OFF();
         } else if (step == 2) {
-            RED_OFF(); BLUE_ON(); GREEN_OFF();
+            COLOR_BLUE();
         }
     }
 }
 
 void LED_Off(void) {
-    RED_OFF();
-    GREEN_OFF();
-    BLUE_OFF();
+	COLOR_OFF(); //[cite: 2]
 }
 
 /* ==================================================================== */
-/* TELEMETRY UPLOAD PATTERNS (Very fast, minimal blocking)              */
+/* TELEMETRY UPLOAD PATTERNS (Green/Red)                                */
 /* ==================================================================== */
 
 void LED_UploadSuccess(void) {
-    // Single quick green blink (50ms is enough to be visible but not block the CPU)
-    GREEN_ON();
+    // Fast Green blink[cite: 2]
+    COLOR_GREEN();
     HAL_Delay(50);
-    GREEN_OFF();
+    COLOR_OFF();
 }
 
 void LED_UploadFail(void) {
-    // Single quick red blink
-    RED_ON();
-    HAL_Delay(50);
-    RED_OFF();
+    // Fast Cyan to Red blink indicating data layer failure
+    COLOR_CYAN(); HAL_Delay(50);
+    COLOR_RED();  HAL_Delay(50);
+    COLOR_OFF();
 }
 
 /* ==================================================================== */
-/* HARDWARE ERROR PATTERNS                                              */
+/* HARDWARE ERROR PATTERNS (Red/Magenta)                                */
 /* ==================================================================== */
 
 void LED_HardwareError(void) {
-    // 5 rapid red flashes to indicate physical intervention required
+    // 5 rapid red flashes[cite: 2]
     for (int i = 0; i < 5; i++) {
-        RED_ON();  HAL_Delay(50);
-        RED_OFF(); HAL_Delay(50);
+        COLOR_RED(); HAL_Delay(50);
+        COLOR_OFF(); HAL_Delay(50);
     }
 }
 
 /* ==================================================================== */
-/* SD CARD FORMAT PATTERNS                                              */
+/* SD CARD FORMAT PATTERNS (Magenta)                                    */
 /* ==================================================================== */
 
 void LED_FormatSuccess(void) {
-    // 3 distinct green blinks to indicate a successful wipe/format
+    // 3 Magenta to Green transitions
     for (int i = 0; i < 3; i++) {
-        GREEN_ON(); BLUE_OFF();
-        HAL_Delay(150);
-        GREEN_OFF(); BLUE_ON();
-        HAL_Delay(150);
-        BLUE_OFF();
-        HAL_Delay(150);
+        COLOR_MAGENTA(); HAL_Delay(150);
+        COLOR_GREEN();   HAL_Delay(150);
+        COLOR_OFF();     HAL_Delay(150);
     }
 }
 
 void LED_FormatFail(void) {
-    // 3 long, slow red blinks indicating a critical drive failure
+    // 3 long Magenta to Red blinks
     for (int i = 0; i < 3; i++) {
-        BLUE_ON(); RED_ON();
-        HAL_Delay(400);
-        BLUE_OFF(); RED_OFF();
-        HAL_Delay(300);
+        COLOR_MAGENTA(); HAL_Delay(400);
+        COLOR_RED();     HAL_Delay(400);
+        COLOR_OFF();     HAL_Delay(300);
     }
+}
+
+/* ==================================================================== */
+/* TCP & NTP PATTERNS (Cyan)                                            */
+/* ==================================================================== */
+
+void LED_TcpRetry(void) {
+    // Quick double Cyan flash
+    COLOR_CYAN(); HAL_Delay(50); COLOR_OFF(); HAL_Delay(50);
+    COLOR_CYAN(); HAL_Delay(50); COLOR_OFF();
+}
+
+void LED_TcpConnected(void) {
+    // One solid Cyan flash
+    COLOR_CYAN(); HAL_Delay(200); COLOR_OFF();
+}
+
+void LED_TcpFailed(void) {
+    // Cyan to Red flash
+    COLOR_CYAN(); HAL_Delay(100);
+    COLOR_RED();  HAL_Delay(200);
+    COLOR_OFF();
+}
+
+void LED_NtpFailed(void) {
+    // Cyan to Yellow pulse to show a minor timing warning
+    COLOR_CYAN();   HAL_Delay(100);
+    COLOR_YELLOW(); HAL_Delay(200);
+    COLOR_OFF();
 }

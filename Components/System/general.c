@@ -3,11 +3,18 @@
 // --- GLOBAL VARIABLES ---
 uint8_t esp_is_ready = 0;
 uint8_t wifi_is_connected = 0;
+uint8_t tcp_is_connected = 0;
+uint8_t ntp_sync_status = 0;
+
 char current_ip[16] = "0.0.0.0";
 char current_ssid[32] = "Not Connected";
 char current_pc_ip[16] = "0.0.0.0";
 
 extern uint8_t format_requested;
+
+static uint8_t current_ap_index = 0;
+static uint32_t last_wifi_attempt_tick = 0;
+static uint32_t wifi_retry_delay = 90000;
 
 
 void Scan_I2C_Bus(I2C_HandleTypeDef *hi2c, char *buffer) {
@@ -30,105 +37,172 @@ void Scan_I2C_Bus(I2C_HandleTypeDef *hi2c, char *buffer) {
 /* ═══════════════════════════════════════════════════════════════ */
 /* TELEMETRY BROADCAST ENGINE                                      */
 /* ═══════════════════════════════════════════════════════════════ */
-static void send_telemetry_wifi(float temp, float hum, int16_t dust, uint16_t raw_adc, float raw_volt, const char* status) {
-    if (!wifi_is_connected) return;
+static int8_t send_telemetry_wifi(float temp, float hum, int16_t dust, uint16_t raw_adc, float raw_volt, const char* status) {
+    if (!tcp_is_connected) return 0;
 
     static char tx_buf[256];
 
-    /* Format a single JSON packet containing all environmental and debug data */
     snprintf(tx_buf, sizeof(tx_buf),
         "{\"type\":\"ENV\",\"temp\":%.1f,\"hum\":%.1f,\"dust\":%.1f,\"raw_adc\":%u,\"raw_volt\":%.2f,\"status\":\"%s\"}\n",
         temp, hum, (float)dust / 10.0f, raw_adc, raw_volt, status);
 
-    WIFI_SendUDPData(tx_buf);
+    return WIFI_SendTCPData(tx_buf);
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
-/* NETWORK CONNECTION ROUTINE (Handles Fallback & UDP Binding)     */
+/* STAGGERED NETWORK CONNECTION (Dynamic Fast/Slow Retry)          */
 /* ═══════════════════════════════════════════════════════════════ */
-void Network_Connect_Routine(void) {
-	OLED_ClearArea(0, 16, 128, 48); // Clear lower area for connection UI
-    OLED_Print(0, 0, "NETWORK CONNECT");
-    OLED_Update();
-
+void Try_Next_WiFi(void) {
     const char* ssids[4]      = {WIFI_SSID_1, WIFI_SSID_2, WIFI_SSID_3, WIFI_SSID_4};
     const char* passes[4]     = {WIFI_PASS_1, WIFI_PASS_2, WIFI_PASS_3, WIFI_PASS_4};
     const char* target_ips[4] = {PC_IP_1, PC_IP_2, PC_IP_3, PC_IP_4};
 
-    const char* active_pc_ip = NULL;
-    wifi_is_connected = 0;
+    OLED_ClearArea(0, 16, 128, 48);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "Trying AP %d...", current_ap_index + 1);
+    OLED_Print(0, 16, buf);
+    OLED_Update();
 
-    for (int i = 0; i < 4; i++) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "Trying AP %d...     ", i + 1);
-        OLED_Print(0, 16, buf);
-        OLED_Update();
+    // Try to connect to just the current index
+    if (WIFI_Connect(ssids[current_ap_index], passes[current_ap_index])) {
 
-        if (WIFI_Connect((char*)ssids[i], (char*)passes[i])) {
-            snprintf(buf, sizeof(buf), "AP %d Connected!    ", i + 1);
-            OLED_Print(0, 26, buf);
+        // --- Wi-Fi Connected Successfully! ---
+        wifi_is_connected = 1;
+        Buzzer_WifiConnected();
+        LED_WifiConnected();
 
-            wifi_is_connected = 1;
-            Buzzer_WifiConnected();
-            LED_WifiConnected();
-            active_pc_ip = target_ips[i];
+        strncpy(current_ssid, ssids[current_ap_index], sizeof(current_ssid) - 1);
+        strncpy(current_pc_ip, target_ips[current_ap_index], sizeof(current_pc_ip) - 1);
 
-            strncpy(current_ssid, ssids[i], sizeof(current_ssid) - 1);
-            strncpy(current_pc_ip, target_ips[i], sizeof(current_pc_ip) - 1);
-            break;
-        } else {
-            WIFI_Disconnect();
-            HAL_Delay(500);
-        }
-    }
-
-    if (wifi_is_connected && active_pc_ip != NULL) {
         if (WIFI_GetIP(current_ip)) {
-            OLED_Print(0, 36, "IP: ");
-            OLED_Print(24, 36, current_ip);
+            OLED_Print(0, 26, "IP: ");
+            OLED_Print(24, 26, current_ip);
         }
         OLED_Update();
+        HAL_Delay(500);
 
-		// 1. Give the ESP TCP/IP stack 500ms to stabilize after getting its IP
-		HAL_Delay(500);
+        WIFI_SendCommand("AT+CIPCLOSE\r\n"); // Drop dead sockets
+        HAL_Delay(500);
 
-		// 2. Force close any phantom sockets from previous resets
-		WIFI_SendCommand("AT+CIPCLOSE\r\n");
-		HAL_Delay(500);
-
-        if (WIFI_StartUDP((char*)active_pc_ip, UDP_PORT)) {
-            OLED_Print(0, 46, "UDP Ready!");
-        } else {
-            OLED_Print(0, 46, "Socket Failure");
-            wifi_is_connected = 0;
-            Buzzer_WifiConnected();
-            LED_WifiDisconnected();
-        }
-        OLED_Update();
-
-        if (wifi_is_connected) {
-			OLED_Print(0, 56, "Syncing Time...");
+        // ========================================================
+		// 1. SYNC TIME FIRST (Before opening TCP)
+		// ========================================================
+		if (wifi_is_connected) {
+			OLED_Print(0, 46, "Syncing Time...");
 			OLED_Update();
-
 			RTC_TimeTypeDef net_time;
 			if (WIFI_GetNTPTime(&net_time)) {
 				RTC_SetTime(&net_time);
-				OLED_Print(0, 56, "Time Synced!   ");
+				ntp_sync_status = 1;
+				OLED_Print(0, 46, "Time Synced!   ");
 			} else {
-				OLED_Print(0, 56, "Time Sync Fail ");
+				ntp_sync_status = 0;
+				OLED_Print(0, 46, "Time Sync Fail ");
+				LED_NtpFailed();
 			}
 			OLED_Update();
 		}
+		HAL_Delay(1000); // Give the ESP a breather
 
-        HAL_Delay(2000);
+		// ========================================================
+		// 2. CONNECT TCP LAST (So it doesn't time out while idle)
+		// ========================================================
+		WIFI_SendCommand("AT+CIPCLOSE\r\n"); // Drop dead sockets
+		HAL_Delay(500);
+
+		if (WIFI_StartTCP(current_pc_ip, TCP_PORT)) {
+			OLED_Print(0, 36, "TCP Ready!");
+			tcp_is_connected = 1;
+			wifi_retry_delay = 90000;
+			LED_TcpConnected();
+		} else {
+			OLED_Print(0, 36, "Socket Failure");
+			tcp_is_connected = 0;
+			wifi_retry_delay = 90000;
+			LED_TcpFailed();
+		}
+		OLED_Update();
+		HAL_Delay(2000);
+
     } else {
-        OLED_Print(0, 36, "APs Failed. Solo Mode");
-        OLED_Update();
-        LED_HardwareError();
-        HAL_Delay(1000);
+        // --- NEW: The AP itself failed! ---
+    	WIFI_Disconnect();
+		wifi_is_connected = 0;
+		tcp_is_connected = 0; // Safety wipe
+		OLED_Print(0, 26, "AP Failed.");
+		OLED_Update();
+		LED_HardwareError();
+		HAL_Delay(1000);
+
+        // Wait 5 full minutes before attempting the next router
+        wifi_retry_delay = 300000;
+
+        // Move to the next AP index
+        current_ap_index++;
+        if (current_ap_index >= 4) current_ap_index = 0;
     }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* BULK SD CARD UPLOAD ROUTINE (FAIL-SAFE)                                */
+/* ═══════════════════════════════════════════════════════════════ */
+void Upload_And_Clear_SD(void) {
+    if (!SD_IsReady()) return;
+
+    uint32_t rows;
+    char temp_str[32];
+    SD_GetLogStats(&rows, temp_str);
+
+    if (rows == 0) return; // The card is empty, skip upload!
+
+    OLED_ClearArea(0, 16, 128, 48);
+    OLED_Print(0, 16, "Uploading SD...");
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%lu Rows left", rows);
+    OLED_Print(0, 26, buf);
+    OLED_Update();
+
+    FIL file;
+    if (f_open(&file, "data.csv", FA_READ | FA_OPEN_EXISTING) == FR_OK) {
+        char line[128]; // Buffer to hold one row of CSV data
+        uint8_t has_data = 0;
+        uint8_t upload_success = 1;
+
+        // Read the file line-by-line until we hit the end
+        while (f_gets(line, sizeof(line), &file)) {
+            has_data = 1;
+            HAL_IWDG_Refresh(&hiwdg); // Pet the dog during long uploads
+
+            // --- NEW: If a single line fails to send, abort immediately! ---
+			if (!WIFI_SendTCPData(line)) {
+				upload_success = 0; // Mark the entire upload as failed
+				break;              // Stop reading the file
+			}
+
+            HAL_Delay(20); // 20ms breather so we don't overwhelm the ESP8266 RAM
+        }
+        f_close(&file);
+
+        // --- NEW: Only wipe the file if EVERY line was acknowledged by the server ---
+		if (has_data && upload_success) {
+			SD_ClearLog(); // Wipe the file!
+			OLED_Print(0, 46, "Upload Complete!");
+			OLED_Update();
+			HAL_Delay(1500);
+		} else if (!upload_success) {
+            OLED_Print(0, 46, "Upload FAILED!  ");
+            OLED_Update();
+            LED_HardwareError();
+            HAL_Delay(1500);
+
+            //tcp_is_connected = 0;
+
+            // --- NEW: Trigger a fast retry in 15 seconds ---
+			wifi_retry_delay = 15000;
+        }
+    }
+}
 
 
 void General_Init(void) {
@@ -214,7 +288,12 @@ void General_Init(void) {
         esp_is_ready = 1;
         OLED_Update();
 
-        Network_Connect_Routine();
+        Try_Next_WiFi();
+
+        if (wifi_is_connected) {
+        	HAL_Delay(1000);
+			Upload_And_Clear_SD();
+		}
 
     } else {
         OLED_Print(80, 16, "FAIL");
@@ -361,21 +440,15 @@ void General_Run(void) {
     }
 
     // ---------------------------------------------------------
-    // LOOP 3: SD LOGGING & WI-FI VERIFICATION (Every 15 Seconds)
-    // ---------------------------------------------------------
-    if (now - last_log_tick >= 15000) {
-        last_log_tick = now;
+	// LOOP 3: HARDWARE VERIFICATION & RECONNECT (Every 15 Seconds)
+	// ---------------------------------------------------------
+	if (now - last_log_tick >= 15000) {
+		last_log_tick = now;
 
-
-        // --- SD CARD AUTO-REMOUNT ---
-		// If the card was removed or failed at boot, try to initialize it again
+		// --- SD CARD AUTO-REMOUNT ---
 		if (!SD_IsReady()) {
 			SD_Init();
-
-			// Play a quick chime so you know it successfully hot-swapped!
-			if (SD_IsReady()) {
-				Buzzer_SD_Inserted();
-			}
+			if (SD_IsReady()) Buzzer_SD_Inserted();
 		}
 
 		// --- AUTO-REFRESH DIAGNOSTICS PAGE LIVE ---
@@ -384,40 +457,71 @@ void General_Run(void) {
 			OLED_Update();
 		}
 
+		// 2. Safely verify the router connection
+		if (wifi_is_connected) {
+			if (!WIFI_IsConnected()) {
+				// Router Drop detected! Flag BOTH offline.
+				wifi_is_connected = 0;
+				tcp_is_connected = 0;
+				Buzzer_WifiDisconnected();
+				LED_WifiDisconnected();
+				last_wifi_attempt_tick = HAL_GetTick();
+			}
+			else if (!tcp_is_connected) {
+				// Wi-Fi is perfectly fine, but TCP is offline!
+				// Retry TCP socket silently every 90 seconds.
+				if (now - last_wifi_attempt_tick >= wifi_retry_delay) {
+					last_wifi_attempt_tick = HAL_GetTick();
 
-        // 2. Safely verify the router connection
-        if (wifi_is_connected) {
-            if (!WIFI_IsConnected()) {
-                // Drop detected! Flag it offline.
-                wifi_is_connected = 0;
-                Buzzer_WifiDisconnected();
-                LED_WifiDisconnected();
-            }
-        }
+					LED_TcpRetry();
 
-        // 3. INSTANT RECONNECT
-        if (!wifi_is_connected && esp_is_ready) {
-            Network_Connect_Routine();
+					if (WIFI_StartTCP(current_pc_ip, TCP_PORT)) {
+						tcp_is_connected = 1;
+						LED_TcpConnected();
+						Upload_And_Clear_SD(); // Upload the backlog!
+					} else {
+						LED_TcpFailed();
+					}
 
-            // Restore the GUI after reconnecting
-            if (current_page == 0) {
-                OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
-            } else if (current_page == 1) {
-                render_wifi_page();
-            } else if (current_page == 2) {
-                OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust);
-            } else if (current_page == 3) {
-                OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
-            } else if (current_page == 4) {         // <--- Add this block
-				OLED_GUI_DrawDiagnosticsPage();
-			} else if (current_page == 5) {
-	            OLED_GUI_DrawLogPage();
-	        } else if (current_page == 6) {     // <--- ADD THIS
-	            OLED_GUI_DrawTimePage();
-	        }
-            OLED_Update();
-        }
-    }
+					// Refresh GUI if user is watching the Network page
+					if (current_page == 1) {
+						render_wifi_page();
+						OLED_Update();
+					}
+				}
+			}
+		} else if (esp_is_ready) {
+			// 3. FULL AP RECONNECT (Every 90 seconds)
+			if (now - last_wifi_attempt_tick >= wifi_retry_delay) {
+
+				Try_Next_WiFi(); // Tries exactly 1 AP, then exits
+
+				last_wifi_attempt_tick = HAL_GetTick();
+
+				if (wifi_is_connected && tcp_is_connected) {
+					Upload_And_Clear_SD(); // Dump the SD card payload!
+				}
+
+				// Restore the GUI after reconnect attempt finishes
+				if (current_page == 0) {
+					OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
+				} else if (current_page == 1) {
+					render_wifi_page();
+				} else if (current_page == 2) {
+					OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust);
+				} else if (current_page == 3) {
+					OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
+				} else if (current_page == 4) {
+					OLED_GUI_DrawDiagnosticsPage();
+				} else if (current_page == 5) {
+					OLED_GUI_DrawLogPage();
+				} else if (current_page == 6) {
+					OLED_GUI_DrawTimePage();
+				}
+				OLED_Update();
+			}
+		}
+	}
 
     // ---------------------------------------------------------
     // LOOP 4: BUTTON UI (Every 50ms)
@@ -449,44 +553,62 @@ void General_Run(void) {
     }
 
     // ---------------------------------------------------------
-    // LOOP 5: DMA TELEMETRY BROADCAST (Every 60 Seconds)
-    // ---------------------------------------------------------
-    if (now - last_telemetry_tick >= 60000) {
-        last_telemetry_tick = now;
+	// LOOP 5: SD LOGGING & TELEMETRY BROADCAST (Every 60 Seconds)
+	// ---------------------------------------------------------
+	if (now - last_telemetry_tick >= 60000) {
+		last_telemetry_tick = now;
 
-        const char* current_status = sensor_ok ? "OK" : "ERROR";
+		// --- NEW: Silent Background Time Sync Retry ---
+		// If we are online but the time failed earlier, try asking again!
+		if (wifi_is_connected && !ntp_sync_status) {
+			RTC_TimeTypeDef net_time;
+			if (WIFI_GetNTPTime(&net_time)) {
+				RTC_SetTime(&net_time);
+				ntp_sync_status = 1; // Locked in!
 
-		// =========================================================
-		// TASK A: SD CARD LOGGING
-		// =========================================================
-
-		// Track the state BEFORE we attempt to write
-		uint8_t sd_was_ready = SD_IsReady();
-
-		// 1. Log to CSV (SD Card Chip)
-		SD_LogData(current_temp, current_hum, current_dust, current_status);
-
-		// 2. Play dismount sound if the write attempt just failed
-		if (sd_was_ready && !SD_IsReady()) {
-			Buzzer_SD_Removed(); // Play the dismount warning!
+				// Instantly refresh the screen if the user is looking at the Time page
+				if (current_page == 6) {
+					OLED_GUI_DrawTimePage();
+					OLED_Update();
+				}
+			}
 		}
+		// ----------------------------------------------
 
-		// 3. AUTO-REFRESH LOG PAGE LIVE
-		if (current_page == 5) {
-			OLED_GUI_DrawLogPage();
-			OLED_Update();
+		const char* current_status = sensor_ok ? "OK" : "ERROR";
+
+		// If either the Router OR the Windows App is offline, log to SD
+		if (!wifi_is_connected || !tcp_is_connected) {
+			// =========================================================
+			// TASK A: OFFLINE - STORE DATA TO SD CARD
+			// =========================================================
+			uint8_t sd_was_ready = SD_IsReady();
+
+			SD_LogData(current_temp, current_hum, current_dust, current_status);
+
+			if (sd_was_ready && !SD_IsReady()) {
+				Buzzer_SD_Removed();
+			}
+
+			if (current_page == 5) {
+				OLED_GUI_DrawLogPage();
+				OLED_Update();
+			}
+		} else {
+			// =========================================================
+			// TASK B: ONLINE - SEND DATA LIVE VIA TCP
+			// =========================================================
+			if (send_telemetry_wifi(current_temp, current_hum, current_dust, dust_raw_adc, dust_raw_voltage, current_status)) {
+				LED_UploadSuccess();
+			} else {
+				// If it fails mid-send, mark TCP offline instantly
+				tcp_is_connected = 0;
+				LED_UploadFail();
+
+				// --- CRITICAL DATA RETENTION ---
+				// Save the data that just failed to transmit!
+				SD_LogData(current_temp, current_hum, current_dust, current_status);
+			}
 		}
-
-
-		// =========================================================
-		// TASK B: WI-FI UPLOAD
-		// =========================================================
-        if (wifi_is_connected) {
-            const char* current_status = sensor_ok ? "OK" : "ERROR";
-            send_telemetry_wifi(current_temp, current_hum, current_dust, dust_raw_adc, dust_raw_voltage, current_status);
-            LED_UploadSuccess();
-        } else {
-        	LED_UploadFail();
-        }
-    }
+	}
 }

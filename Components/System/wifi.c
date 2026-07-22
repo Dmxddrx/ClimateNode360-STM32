@@ -6,6 +6,7 @@
 extern IWDG_HandleTypeDef hiwdg;
 
 char buffer[512];
+char ntp_debug_str[64] = "Waiting";
 
 void WIFI_SendCommand(const char* command) {
     /* 1. Prevent collisions: Wait for any active background DMA transfers to finish */
@@ -33,9 +34,13 @@ int8_t WIFI_WaitForResponse(const char* expected_response, uint32_t timeout) {
     huart2.RxState = HAL_UART_STATE_READY;
     // ------------------------------------------
 
+
     while (HAL_GetTick() - startTime < timeout) {
 
+    	// --- CRITICAL: KEEP SYSTEM ALIVE DURING LONG WI-FI WAITS ---
     	HAL_IWDG_Refresh(&hiwdg);
+    	BTNS_Update(); // Prevent touch buttons from freezing!
+
 
         uint8_t data;
         if (HAL_UART_Receive(&huart2, &data, 1, 1) == HAL_OK) {
@@ -211,6 +216,40 @@ int8_t WIFI_SendUDPData(const char* data) {
     return 0; // Failed
 }
 
+int8_t WIFI_StartTCP(const char* target_ip, uint16_t port) {
+    char cmd[128];
+    // Changed "UDP" to "TCP"
+    sprintf(cmd, "AT+CIPSTART=\"TCP\",\"%s\",%d\r\n", target_ip, port);
+
+    WIFI_SendCommand(cmd);
+
+    // TCP requires a handshake, so give it up to 5 seconds to establish the link
+    return WIFI_WaitForResponse("OK", 5000);
+}
+
+int8_t WIFI_SendTCPData(const char* data) {
+    char cmd[32];
+    uint16_t len = strlen(data);
+
+    /* Wait for the UART to be completely free */
+    while (huart2.gState != HAL_UART_STATE_READY) {
+        HAL_IWDG_Refresh(&hiwdg);
+    }
+
+    // 1. Tell ESP how many bytes to send
+    sprintf(cmd, "AT+CIPSEND=%d\r\n", len);
+    WIFI_SendCommand(cmd);
+
+    // 2. Wait for the '>' prompt
+    if (WIFI_WaitForResponse(">", 2000)) {
+        // 3. Send using standard blocking mode to prevent buffer corruption
+        // during rapid SD card bulk uploads.
+        HAL_UART_Transmit(&huart2, (uint8_t*)data, len, 1000);
+        return 1;
+    }
+    return 0; // Failed
+}
+
 int8_t WIFI_IsConnected(void) {
     /* Ask the ESP8266 what router it is currently connected to */
     WIFI_SendCommand("AT+CWJAP?\r\n");
@@ -228,53 +267,96 @@ int8_t WIFI_IsConnected(void) {
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
-/* NTP TIME SYNCHRONIZATION                                        */
+/* NTP TIME SYNCHRONIZATION (UNIVERSAL HOTSPOT PARSER)             */
 /* ═══════════════════════════════════════════════════════════════ */
 int8_t WIFI_GetNTPTime(RTC_TimeTypeDef *rtc_time) {
-    // 1. Enable SNTP, set timezone to +5:30, and target pool.ntp.org
-    WIFI_SendCommand("AT+CIPSNTPCFG=1,5.5,\"pool.ntp.org\"\r\n");
-    WIFI_WaitForResponse("OK", 1000);
 
-    // 2. Poll for the time. It takes a second or two for the ESP to fetch it over the internet.
-    for (int i = 0; i < 5; i++) {
-        HAL_Delay(1000); // Wait 1 second between attempts
+    // 1. Enable SNTP only ONCE so we don't accidentally restart the background client!
+    static uint8_t sntp_configured = 0;
+
+    if (!sntp_configured) {
+    	WIFI_SendCommand("AT+CIPSNTPCFG=1,5,\"216.239.35.0\"\r\n");
+
+        if (!WIFI_WaitForResponse("OK", 1000)) {
+            if (strstr(buffer, "ERROR")) strcpy(ntp_debug_str, "CFG: AT ERROR");
+            else strcpy(ntp_debug_str, "CFG: TIMEOUT");
+        }
+        sntp_configured = 1;
+    }
+
+    // 2. Poll for the time. Give the hotspot 20 seconds to establish routing!
+    for (int i = 0; i < 20; i++) {
+    	uint32_t wait_start = HAL_GetTick();
+		while(HAL_GetTick() - wait_start < 1000) {
+			HAL_IWDG_Refresh(&hiwdg);
+			BTNS_Update();
+		}
 
         WIFI_SendCommand("AT+CIPSNTPTIME?\r\n");
         if (WIFI_WaitForResponse("+CIPSNTPTIME:", 1000)) {
 
             char *time_ptr = strstr(buffer, "+CIPSNTPTIME:");
 
-            // If the ESP returns 1970, it hasn't successfully synced with the server yet.
-            if (time_ptr != NULL && !strstr(time_ptr, "1970")) {
+            if (time_ptr != NULL) {
+                char *time_data = time_ptr + 13;
 
-                char dow_str[4], mon_str[4];
-                int day, hour, min, sec, year;
+                // SANITIZE: Prevent OLED crashing
+                for (int j = 0; time_data[j] != '\0'; j++) {
+                    if (time_data[j] == '\r' || time_data[j] == '\n') {
+                        time_data[j] = '\0';
+                        break;
+                    }
+                }
 
-                // Example ESP8266 Response: +CIPSNTPTIME:Wed Jul 22 12:42:22 2026
-                if (sscanf(time_ptr, "+CIPSNTPTIME:%3s %3s %d %d:%d:%d %d",
-                           dow_str, mon_str, &day, &hour, &min, &sec, &year) == 7) {
+                // Lag check: Let the 20-second loop keep trying!
+                if (strlen(time_data) < 5 || strstr(time_data, "1970")) {
+                    strcpy(ntp_debug_str, "Lagging");
+                    continue;
+                }
+
+                int year, month = 1, day, hour, min, sec;
+                char dow_str[4] = "", mon_str[4] = "";
+                uint8_t parse_success = 0;
+
+                if (sscanf(time_data, "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec) == 6) {
+                    parse_success = 1;
+                }
+                else if (sscanf(time_data, "%3s %3s %d %d:%d:%d %d", dow_str, mon_str, &day, &hour, &min, &sec, &year) == 7) {
+                    parse_success = 1;
+
+                    if (strstr(mon_str, "Jan")) month = 1;
+                    else if (strstr(mon_str, "Feb")) month = 2;
+                    else if (strstr(mon_str, "Mar")) month = 3;
+                    else if (strstr(mon_str, "Apr")) month = 4;
+                    else if (strstr(mon_str, "May")) month = 5;
+                    else if (strstr(mon_str, "Jun")) month = 6;
+                    else if (strstr(mon_str, "Jul")) month = 7;
+                    else if (strstr(mon_str, "Aug")) month = 8;
+                    else if (strstr(mon_str, "Sep")) month = 9;
+                    else if (strstr(mon_str, "Oct")) month = 10;
+                    else if (strstr(mon_str, "Nov")) month = 11;
+                    else if (strstr(mon_str, "Dec")) month = 12;
+                }
+
+                if (parse_success) {
+                    // --- SRI LANKA +5:30 FIX ---
+                    min += 30;
+                    if (min >= 60) {
+                        min -= 60; hour += 1;
+                        if (hour >= 24) { hour -= 24; day += 1; }
+                    }
 
                     rtc_time->Seconds = sec;
                     rtc_time->Minutes = min;
                     rtc_time->Hour = hour;
                     rtc_time->Date = day;
-                    rtc_time->Year = year % 100; // Convert 2026 to 26
+                    rtc_time->Month = month;
 
-                    // Convert Month String to Number
-                    if (strstr(mon_str, "Jan")) rtc_time->Month = 1;
-                    else if (strstr(mon_str, "Feb")) rtc_time->Month = 2;
-                    else if (strstr(mon_str, "Mar")) rtc_time->Month = 3;
-                    else if (strstr(mon_str, "Apr")) rtc_time->Month = 4;
-                    else if (strstr(mon_str, "May")) rtc_time->Month = 5;
-                    else if (strstr(mon_str, "Jun")) rtc_time->Month = 6;
-                    else if (strstr(mon_str, "Jul")) rtc_time->Month = 7;
-                    else if (strstr(mon_str, "Aug")) rtc_time->Month = 8;
-                    else if (strstr(mon_str, "Sep")) rtc_time->Month = 9;
-                    else if (strstr(mon_str, "Oct")) rtc_time->Month = 10;
-                    else if (strstr(mon_str, "Nov")) rtc_time->Month = 11;
-                    else if (strstr(mon_str, "Dec")) rtc_time->Month = 12;
+                    if (year >= 2000) rtc_time->Year = year % 100;
+                    else rtc_time->Year = year;
 
-                    // Convert Day String to Number
+                    rtc_time->DayOfWeek = 1; // Fallback
+
                     if (strstr(dow_str, "Mon")) rtc_time->DayOfWeek = 1;
                     else if (strstr(dow_str, "Tue")) rtc_time->DayOfWeek = 2;
                     else if (strstr(dow_str, "Wed")) rtc_time->DayOfWeek = 3;
@@ -283,10 +365,16 @@ int8_t WIFI_GetNTPTime(RTC_TimeTypeDef *rtc_time) {
                     else if (strstr(dow_str, "Sat")) rtc_time->DayOfWeek = 6;
                     else if (strstr(dow_str, "Sun")) rtc_time->DayOfWeek = 7;
 
-                    return 1; // Successfully parsed and synced!
+                    strcpy(ntp_debug_str, "SUCCESS");
+                    return 1;
+                } else {
+                    snprintf(ntp_debug_str, sizeof(ntp_debug_str), "Bad:%s", time_data);
                 }
             }
+        } else {
+            if (strstr(buffer, "ERROR")) strcpy(ntp_debug_str, "TIME: AT ERROR");
+            else strcpy(ntp_debug_str, "TIME: TIMEOUT");
         }
     }
-    return 0; // Failed to sync after 5 attempts
+    return 0;
 }

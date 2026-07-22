@@ -1,5 +1,6 @@
 ../Components/Sensors/sd.c:16:9:SD_Init	704	static
-../Components/Sensors/sd.c:74:9:SD_LogData	200	static
-../Components/Sensors/sd.c:126:9:SD_Format	40	static
-../Components/Sensors/sd.c:155:9:SD_IsReady	0	static
-../Components/Sensors/sd.c:159:6:SD_GetLogStats	0	static
+../Components/Sensors/sd.c:74:9:SD_LogData	240	static
+../Components/Sensors/sd.c:132:9:SD_Format	40	static
+../Components/Sensors/sd.c:161:9:SD_IsReady	0	static
+../Components/Sensors/sd.c:165:6:SD_GetLogStats	0	static
+../Components/Sensors/sd.c:170:6:SD_ClearLog	8	static

@@ -14,5 +14,6 @@ uint8_t SD_Format(void);
 
 uint8_t SD_IsReady(void);
 void SD_GetLogStats(uint32_t *rows, char *last_line);
+void SD_ClearLog(void);
 
 #endif /* SD_H */
