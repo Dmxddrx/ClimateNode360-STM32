@@ -79,7 +79,7 @@ void Try_Next_WiFi(void) {
             OLED_Print(24, 26, current_ip);
         }
         OLED_Update();
-        HAL_Delay(500);
+        HAL_Delay(2000);
 
         WIFI_SendCommand("AT+CIPCLOSE\r\n"); // Drop dead sockets
         HAL_Delay(500);

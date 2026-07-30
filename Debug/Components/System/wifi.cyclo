@@ -9,4 +9,4 @@
 ../Components/System/wifi.c:219:8:WIFI_StartTCP	1
 ../Components/System/wifi.c:230:8:WIFI_SendTCPData	3
 ../Components/System/wifi.c:253:8:WIFI_IsConnected	2
-../Components/System/wifi.c:272:8:WIFI_GetNTPTime	38
+../Components/System/wifi.c:272:8:WIFI_GetNTPTime	45

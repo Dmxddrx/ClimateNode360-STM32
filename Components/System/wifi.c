@@ -275,7 +275,7 @@ int8_t WIFI_GetNTPTime(RTC_TimeTypeDef *rtc_time) {
     static uint8_t sntp_configured = 0;
 
     if (!sntp_configured) {
-    	WIFI_SendCommand("AT+CIPSNTPCFG=1,5,\"216.239.35.0\"\r\n");
+    	WIFI_SendCommand("AT+CIPSNTPCFG=1,5,\"pool.ntp.org\",\"time.windows.com\",\"time.google.com\"\r\n");
 
         if (!WIFI_WaitForResponse("OK", 1000)) {
             if (strstr(buffer, "ERROR")) strcpy(ntp_debug_str, "CFG: AT ERROR");
@@ -340,11 +340,35 @@ int8_t WIFI_GetNTPTime(RTC_TimeTypeDef *rtc_time) {
 
                 if (parse_success) {
                     // --- SRI LANKA +5:30 FIX ---
-                    min += 30;
-                    if (min >= 60) {
-                        min -= 60; hour += 1;
-                        if (hour >= 24) { hour -= 24; day += 1; }
-                    }
+                	min += 30;
+					if (min >= 60) {
+						min -= 60;
+						hour += 1;
+						if (hour >= 24) {
+							hour -= 24;
+							day += 1;
+
+							// --- NEW: Prevent DS3231 crash by capping the month! ---
+							uint8_t max_days = 31;
+							if (month == 4 || month == 6 || month == 9 || month == 11) {
+								max_days = 30;
+							} else if (month == 2) {
+								// Basic leap year check
+								uint8_t is_leap = ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0));
+								max_days = is_leap ? 29 : 28;
+							}
+
+							// Roll over the month and year if we exceed max days
+							if (day > max_days) {
+								day = 1;
+								month += 1;
+								if (month > 12) {
+									month = 1;
+									year += 1;
+								}
+							}
+						}
+					}
 
                     rtc_time->Seconds = sec;
                     rtc_time->Minutes = min;

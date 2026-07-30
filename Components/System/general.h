@@ -87,13 +87,13 @@ extern SPI_HandleTypeDef hspi1;
 //#define UDP_PORT    8080
 #define TCP_PORT    8080
 
-#define WIFI_SSID_2 "ENTGRA 2.5G"
-#define WIFI_PASS_2 "Entgra@110"
-#define PC_IP_2     "192.168.8.198"
+#define WIFI_SSID_1 "ENTGRA 2.5G"
+#define WIFI_PASS_1 "Entgra@110"
+#define PC_IP_1     "192.168.8.198"
 
-#define WIFI_SSID_1 "Dmx's Note20 Ultra"
-#define WIFI_PASS_1 "11111129"
-#define PC_IP_1     "10.184.253.199"
+#define WIFI_SSID_2 "Dmx's Note20 Ultra"
+#define WIFI_PASS_2 "11111129"
+#define PC_IP_2     "10.225.206.199"
 
 #define WIFI_SSID_3 "Dialog 4G 208"
 #define WIFI_PASS_3 "Hasith2001"
