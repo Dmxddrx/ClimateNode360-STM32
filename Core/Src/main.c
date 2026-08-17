@@ -566,6 +566,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : BTN_OLED_PAGE_Pin */
+  GPIO_InitStruct.Pin = BTN_OLED_PAGE_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BTN_OLED_PAGE_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : SPI1_CS_Pin */
   GPIO_InitStruct.Pin = SPI1_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -589,11 +595,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(DUST_LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : EXT_PWR_Pin BTN_OLED_PAGE_Pin */
-  GPIO_InitStruct.Pin = EXT_PWR_Pin|BTN_OLED_PAGE_Pin;
+  /*Configure GPIO pin : EXT_PWR_Pin */
+  GPIO_InitStruct.Pin = EXT_PWR_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(EXT_PWR_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 

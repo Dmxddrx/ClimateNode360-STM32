@@ -59,6 +59,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define BTN_OLED_PAGE_Pin GPIO_PIN_0
+#define BTN_OLED_PAGE_GPIO_Port GPIOA
 #define V_OUT_Pin GPIO_PIN_1
 #define V_OUT_GPIO_Port GPIOA
 #define SPI1_CS_Pin GPIO_PIN_4
@@ -81,8 +83,6 @@ void Error_Handler(void);
 #define DUST_LED_GPIO_Port GPIOA
 #define EXT_PWR_Pin GPIO_PIN_4
 #define EXT_PWR_GPIO_Port GPIOB
-#define BTN_OLED_PAGE_Pin GPIO_PIN_5
-#define BTN_OLED_PAGE_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
