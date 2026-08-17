@@ -242,10 +242,12 @@ int8_t WIFI_SendTCPData(const char* data) {
 
     // 2. Wait for the '>' prompt
     if (WIFI_WaitForResponse(">", 2000)) {
-        // 3. Send using standard blocking mode to prevent buffer corruption
-        // during rapid SD card bulk uploads.
+        // 3. Send using standard blocking mode
         HAL_UART_Transmit(&huart2, (uint8_t*)data, len, 1000);
-        return 1;
+
+        // --- CRITICAL FIX: WAIT FOR SEND OK ---
+        // Prevents the STM32 from overwhelming the ESP-01S during bulk SD uploads!
+        return WIFI_WaitForResponse("SEND OK", 3000);
     }
     return 0; // Failed
 }
@@ -271,21 +273,34 @@ int8_t WIFI_IsConnected(void) {
 /* ═══════════════════════════════════════════════════════════════ */
 int8_t WIFI_GetNTPTime(RTC_TimeTypeDef *rtc_time) {
 
-    // 1. Enable SNTP only ONCE so we don't accidentally restart the background client!
-    static uint8_t sntp_configured = 0;
+	// 1. Enable SNTP only ONCE so we don't accidentally restart the background client!
+	static uint8_t sntp_configured = 0;
 
-    if (!sntp_configured) {
-    	WIFI_SendCommand("AT+CIPSNTPCFG=1,5,\"pool.ntp.org\",\"time.windows.com\",\"time.google.com\"\r\n");
+	if (!sntp_configured) {
+		strcpy(ntp_debug_str, "NTP CFG...");
+		// Use the Dialog NTP servers that we just proved work!
+		WIFI_SendCommand(
+			"AT+CIPSNTPCFG=1,5,\"ltentp1.dialog.lk\","
+			"\"ltentp2.dialog.lk\",\"pool.ntp.org\"\r\n"
+		);
 
-        if (!WIFI_WaitForResponse("OK", 1000)) {
-            if (strstr(buffer, "ERROR")) strcpy(ntp_debug_str, "CFG: AT ERROR");
-            else strcpy(ntp_debug_str, "CFG: TIMEOUT");
-        }
-        sntp_configured = 1;
-    }
+		// BUG FIX: Only set the flag to 1 if we actually get an "OK"
+		if (WIFI_WaitForResponse("OK", 2000)) {
+			sntp_configured = 1;
+			strcpy(ntp_debug_str, "NTP CFG OK");
+		} else {
+			if (strstr(buffer, "ERROR")) {
+				strcpy(ntp_debug_str, "CFG: AT ERROR");
+			} else {
+				strcpy(ntp_debug_str, "CFG: TIMEOUT");
+			}
+			sntp_configured = 0; // KEEP AS 0 SO IT TRIES AGAIN!
+			return 0;
+		}
+	}
 
-    // 2. Poll for the time. Give the hotspot 20 seconds to establish routing!
-    for (int i = 0; i < 20; i++) {
+    // 2. Poll for the time. Give the hotspot 30 seconds to establish routing!
+    for (int i = 0; i < 30; i++) {
     	uint32_t wait_start = HAL_GetTick();
 		while(HAL_GetTick() - wait_start < 1000) {
 			HAL_IWDG_Refresh(&hiwdg);
@@ -293,7 +308,7 @@ int8_t WIFI_GetNTPTime(RTC_TimeTypeDef *rtc_time) {
 		}
 
         WIFI_SendCommand("AT+CIPSNTPTIME?\r\n");
-        if (WIFI_WaitForResponse("+CIPSNTPTIME:", 1000)) {
+        if (WIFI_WaitForResponse("OK", 1000)) {
 
             char *time_ptr = strstr(buffer, "+CIPSNTPTIME:");
 

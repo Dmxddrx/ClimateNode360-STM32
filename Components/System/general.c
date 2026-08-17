@@ -42,9 +42,10 @@ static int8_t send_telemetry_wifi(float temp, float hum, int16_t dust, uint16_t 
 
     static char tx_buf[256];
 
+    // Added \"device_id\":\"%s\" to the JSON string and DEVICE_ID to the arguments
     snprintf(tx_buf, sizeof(tx_buf),
-        "{\"type\":\"ENV\",\"temp\":%.1f,\"hum\":%.1f,\"dust\":%.1f,\"raw_adc\":%u,\"raw_volt\":%.2f,\"status\":\"%s\"}\n",
-        temp, hum, (float)dust / 10.0f, raw_adc, raw_volt, status);
+        "{\"type\":\"ENV\",\"device_id\":\"%s\",\"temp\":%.1f,\"hum\":%.1f,\"dust\":%.1f,\"raw_adc\":%u,\"raw_volt\":%.2f,\"status\":\"%s\"}\n",
+        DEVICE_ID, temp, hum, (float)dust / 10.0f, raw_adc, raw_volt, status);
 
     return WIFI_SendTCPData(tx_buf);
 }
@@ -368,22 +369,15 @@ void General_Run(void) {
 		HAL_Delay(2000); // Hold the result on screen for 2 seconds
 
 		// Force the display to instantly redraw the current page
-		        if (current_page == 0) {
-		            OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
-		        } else if (current_page == 1) {
-		            render_wifi_page();
-		        } else if (current_page == 2) {
-		            OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust);
-		        } else if (current_page == 3) {
-		            OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
-		        } else if (current_page == 4) {
-		            OLED_GUI_DrawDiagnosticsPage();
-		        } else if (current_page == 5) {
-		            OLED_GUI_DrawLogPage();
-		        } else if (current_page == 6) {     // <--- ADD THIS
-		            OLED_GUI_DrawTimePage();
-		        }
-		        OLED_Update();
+		OLED_Clear();
+		if (current_page == 0) OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
+		else if (current_page == 1) render_wifi_page();
+		else if (current_page == 2) OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust);
+		else if (current_page == 3) OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
+		else if (current_page == 4) OLED_GUI_DrawDiagnosticsPage();
+		else if (current_page == 5) OLED_GUI_DrawLogPage();
+		else if (current_page == 6) OLED_GUI_DrawTimePage();
+		OLED_Update();
 	}
 
     // Force an immediate poll of everything on first boot
@@ -405,19 +399,10 @@ void General_Run(void) {
         current_dust = readDust();
 
         // Auto-refresh the screens that show dust data instantly
-        if (current_page == 0) {
-            OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
-            OLED_Update();
-        } else if (current_page == 2) {
-            OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust);
-            OLED_Update();
-        } else if (current_page == 3) {
-            OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
-            OLED_Update();
-        } else if (current_page == 6) {     // <--- ADD THIS
-            OLED_GUI_DrawTimePage();
-            OLED_Update();
-        }
+        if (current_page == 0) { OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust); OLED_Update(); }
+		else if (current_page == 2) { OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust); OLED_Update(); }
+		else if (current_page == 3) { OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust); OLED_Update(); }
+		else if (current_page == 6) { OLED_GUI_DrawTimePage(); OLED_Update(); }
 
     }
 
@@ -430,13 +415,8 @@ void General_Run(void) {
         sensor_ok = SHT30_Read(&current_temp, &current_hum);
 
         // Auto-refresh the Main Sensor screen
-        if (current_page == 0) {
-            OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
-            OLED_Update();
-        } else if (current_page == 3) {
-            OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
-            OLED_Update();
-        }
+        if (current_page == 0) { OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust); OLED_Update(); }
+		else if (current_page == 3) { OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust); OLED_Update(); }
     }
 
     // ---------------------------------------------------------
@@ -479,15 +459,21 @@ void General_Run(void) {
 						tcp_is_connected = 1;
 						LED_TcpConnected();
 						Upload_And_Clear_SD(); // Upload the backlog!
+
+						last_telemetry_tick = now - 60000;
 					} else {
 						LED_TcpFailed();
 					}
 
-					// Refresh GUI if user is watching the Network page
-					if (current_page == 1) {
-						render_wifi_page();
-						OLED_Update();
-					}
+					OLED_Clear();
+					if (current_page == 0) OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
+					else if (current_page == 1) render_wifi_page();
+					else if (current_page == 2) OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust);
+					else if (current_page == 3) OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
+					else if (current_page == 4) OLED_GUI_DrawDiagnosticsPage();
+					else if (current_page == 5) OLED_GUI_DrawLogPage();
+					else if (current_page == 6) OLED_GUI_DrawTimePage();
+					OLED_Update();
 				}
 			}
 		} else if (esp_is_ready) {
@@ -500,30 +486,25 @@ void General_Run(void) {
 
 				if (wifi_is_connected && tcp_is_connected) {
 					Upload_And_Clear_SD(); // Dump the SD card payload!
+					last_telemetry_tick = now - 60000;
 				}
 
 				// Restore the GUI after reconnect attempt finishes
-				if (current_page == 0) {
-					OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
-				} else if (current_page == 1) {
-					render_wifi_page();
-				} else if (current_page == 2) {
-					OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust);
-				} else if (current_page == 3) {
-					OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
-				} else if (current_page == 4) {
-					OLED_GUI_DrawDiagnosticsPage();
-				} else if (current_page == 5) {
-					OLED_GUI_DrawLogPage();
-				} else if (current_page == 6) {
-					OLED_GUI_DrawTimePage();
-				}
+				// Clean UI Restore for Loop 3
+				OLED_Clear();
+				if (current_page == 0) OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
+				else if (current_page == 1) render_wifi_page();
+				else if (current_page == 2) OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust);
+				else if (current_page == 3) OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
+				else if (current_page == 4) OLED_GUI_DrawDiagnosticsPage();
+				else if (current_page == 5) OLED_GUI_DrawLogPage();
+				else if (current_page == 6) OLED_GUI_DrawTimePage();
 				OLED_Update();
 			}
 		}
 	}
 
-    // ---------------------------------------------------------
+	// ---------------------------------------------------------
     // LOOP 4: BUTTON UI (Every 50ms)
     // ---------------------------------------------------------
     if (now - last_ui_tick >= 50) {
@@ -533,21 +514,15 @@ void General_Run(void) {
             current_page++;
             if (current_page > 6) current_page = 0;
 
-            if (current_page == 0) {
-                OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
-            } else if (current_page == 1) {
-                render_wifi_page();
-            } else if (current_page == 2) {
-                OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust);
-            } else if (current_page == 3) {
-                OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
-            } else if (current_page == 4) {         // <--- Add this block
-				OLED_GUI_DrawDiagnosticsPage();
-			} else if (current_page == 5) {
-	            OLED_GUI_DrawLogPage();
-	        } else if (current_page == 6) {     // <--- ADD THIS
-	            OLED_GUI_DrawTimePage();
-	        }
+            OLED_Clear(); // Added clear here to make standard paging clean too
+            if (current_page == 0) OLED_GUI_DrawSensorPage(current_temp, current_hum, current_dust);
+            else if (current_page == 1) render_wifi_page();
+            else if (current_page == 2) OLED_GUI_DrawDustDebugPage(dust_raw_adc, dust_raw_voltage, current_dust);
+            else if (current_page == 3) OLED_GUI_DrawWeatherPage(current_temp, current_hum, current_dust);
+            else if (current_page == 4) OLED_GUI_DrawDiagnosticsPage();
+			else if (current_page == 5) OLED_GUI_DrawLogPage();
+	        else if (current_page == 6) OLED_GUI_DrawTimePage();
+
             OLED_Update();
         }
     }

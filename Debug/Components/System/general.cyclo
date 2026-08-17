@@ -1,5 +1,5 @@
 ../Components/System/general.c:20:6:Scan_I2C_Bus	4
-../Components/System/general.c:55:6:Try_Next_WiFi	7
-../Components/System/general.c:150:6:Upload_And_Clear_SD	9
-../Components/System/general.c:208:6:General_Init	6
-../Components/System/general.c:324:6:General_Run	60
+../Components/System/general.c:56:6:Try_Next_WiFi	7
+../Components/System/general.c:151:6:Upload_And_Clear_SD	9
+../Components/System/general.c:209:6:General_Init	6
+../Components/System/general.c:325:6:General_Run	66

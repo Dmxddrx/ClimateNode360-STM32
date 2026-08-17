@@ -84,7 +84,7 @@ extern I2C_HandleTypeDef hi2c2;
 extern SPI_HandleTypeDef hspi1;
 
 // --- NETWORK CONFIGURATIONS ---
-//#define UDP_PORT    8080
+#define DEVICE_ID   "Node_01"
 #define TCP_PORT    8080
 
 #define WIFI_SSID_1 "ENTGRA 2.5G"
